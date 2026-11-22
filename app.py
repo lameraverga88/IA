@@ -2,12 +2,12 @@ import os
 from openai import OpenAI
 import streamlit as st
 
-st.title("Mi Agente Multi-IA en la Nube")
+st.title("SatanaS")
 
 # Pide tu API Key gratuita de OpenRouter en la barra lateral
 api_key = st.sidebar.text_input("OpenRouter API Key", type="password")
 
-if prompt := st.chat_input("Escribe tu consulta..."):
+if prompt := st.chat_input("Ordene Patron..."):
     if not api_key:
         st.warning("Por favor ingresa tu API Key de OpenRouter a la izquierda.")
     else:
