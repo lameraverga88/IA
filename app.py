@@ -4,62 +4,85 @@ import streamlit as st
 
 st.title("Mi Agente Multi-IA en la Nube")
 
-api_key = st.sidebar.text_input("OpenRouter API Key", type="password")
-
-# Lista directa de modelos gratuitos activos (sin hacer GET previo)
-MODELOS_GRATIS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemma-3-27b-it:free",
-    "qwen/qwen-2.5-72b-instruct:free",
-    "deepseek/deepseek-r1:free",
-    "mistralai/mistral-small-3.1-24b-instruct:free",
-]
+st.sidebar.header("Claves API Gratuitas")
+groq_key = st.sidebar.text_input(
+    "Groq API Key (://groq.com)", type="password"
+)
+gemini_key = st.sidebar.text_input(
+    "Gemini API Key (://google.com)", type="password"
+)
 
 if prompt := st.chat_input("Escribe tu consulta..."):
-    if not api_key:
-        st.warning("Por favor ingresa tu API Key de OpenRouter a la izquierda.")
+    if not groq_key and not gemini_key:
+        st.warning(
+            "Ingresa al menos una clave gratuita (Groq o Gemini) en la barra izquierda."
+        )
     else:
         st.chat_message("user").write(prompt)
-        headers = {
-            "Authorization": f"Bearer {api_key.strip()}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://streamlit.io",
-            "X-Title": "Agente Multi-IA",
-        }
 
-        with st.spinner("Consultando modelos gratuitos al azar..."):
-            candidatos = MODELOS_GRATIS.copy()
-            random.shuffle(candidatos)
-            exito = False
-            ultimo_error = ""
+        # Armamos la lista de IAs disponibles según las claves que pusiste
+        opciones_ia = []
+        if groq_key:
+            opciones_ia.extend([
+                ("Groq - Llama 3.3 70B", "groq", "llama-3.3-70b-versatile"),
+                ("Groq - Llama 3.1 8B", "groq", "llama-3.1-8b-instant"),
+                ("Groq - Qwen QwQ 32B", "groq", "qwen-qwq-32b"),
+            ])
+        if gemini_key:
+            opciones_ia.extend([
+                ("Google - Gemini 2.5 Flash", "gemini", "gemini-2.5-flash"),
+                (
+                    "Google - Gemini 2.5 Flash Lite",
+                    "gemini",
+                    "gemini-2.5-flash-lite",
+                ),
+            ])
 
-            for modelo in candidatos:
-                try:
+        # Elige una IA al azar entre todas las disponibles
+        nombre_ia, proveedor, modelo_id = random.choice(opciones_ia)
+
+        with st.spinner(f"Enrutando al azar a {nombre_ia}..."):
+            try:
+                if proveedor == "groq":
                     res = requests.post(
-                        "https://openrouter.ai",
-                        headers=headers,
+                        "https://groq.com",
+                        headers={
+                            "Authorization": f"Bearer {groq_key.strip()}",
+                            "Content-Type": "application/json",
+                        },
                         json={
-                            "model": modelo,
+                            "model": modelo_id,
                             "messages": [{"role": "user", "content": prompt}],
                         },
                         timeout=25,
                     )
-
-                    if res.status_code == 200 and res.text.strip():
-                        datos = res.json()
-                        if "choices" in datos and len(datos["choices"]) > 0:
-                            texto = datos["choices"]["message"]["content"]
-                            st.chat_message("assistant").markdown(
-                                f"**[Respondido por: `{modelo}`]**\n\n{texto}"
-                            )
-                            exito = True
-                            break
+                    datos = res.json()
+                    if "choices" in datos:
+                        texto = datos["choices"]["message"]["content"]
+                        st.chat_message("assistant").markdown(
+                            f"**[Respondido al azar por: `{nombre_ia}`]**\n\n{texto}"
+                        )
                     else:
-                        ultimo_error = f"Código {res.status_code} en {modelo}: {res.text[:200]}"
-                except Exception as e:
-                    ultimo_error = f"Fallo en {modelo}: {e}"
+                        st.error(f"Error de Groq: {datos}")
 
-            if not exito:
-                st.error(
-                    f"Ningún modelo respondió. Último detalle: {ultimo_error}"
-                )
+                elif proveedor == "gemini":
+                    url = f"https://googleapis.com{modelo_id}:generateContent?key={gemini_key.strip()}"
+                    res = requests.post(
+                        url,
+                        headers={"Content-Type": "application/json"},
+                        json={"contents": [{"parts": [{"text": prompt}]}]},
+                        timeout=25,
+                    )
+                    datos = res.json()
+                    if "candidates" in datos:
+                        texto = datos["candidates"]["content"]["parts"][
+                            "text"
+                        ]
+                        st.chat_message("assistant").markdown(
+                            f"**[Respondido al azar por: `{nombre_ia}`]**\n\n{texto}"
+                        )
+                    else:
+                        st.error(f"Error de Gemini: {datos}")
+
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
